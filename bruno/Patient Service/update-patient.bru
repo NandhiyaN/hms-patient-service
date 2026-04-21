@@ -1,0 +1,25 @@
+meta {
+  name: Update Patient
+  type: http
+  seq: 4
+}
+
+put {
+  url: http://localhost:9001/v1/patients/1
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer reception_test
+  X-Correlation-ID: patient-update-001
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "John Doe Updated",
+    "phone": "9000000000",
+    "is_active": true
+  }
+}

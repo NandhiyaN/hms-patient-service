@@ -1,0 +1,16 @@
+meta {
+  name: Get Patients
+  type: http
+  seq: 2
+}
+
+get {
+  url: http://localhost:9001/v1/patients?skip=0&limit=10&is_active=true
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer reception_test
+  X-Correlation-ID: patient-list-001
+}

@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+sqlalchemy
+httpx
+pydantic
+pydantic-settings
+email-validator
+prometheus-client
+pytest
