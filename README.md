@@ -273,7 +273,7 @@ Returned in response
 
  ### Step 1: Clone the repository
     ```bash
-    git clone <repo-url>
+    git clone https://github.com/NandhiyaN/hms-patient-service
     cd patient-service
     ```
  ### Step 2: Create virtual environment
@@ -290,11 +290,12 @@ Returned in response
  ### Step 4: Install dependencies
     ```bash
     pip install -r requirements.txt
+    pip install uvicorn
     ```
 
  ### Step 5: Run the service
     ```bash
-    uvicorn patient_service:app --host 0.0.0.0 --port 9001 --reload
+    python -m uvicorn gateway:app --reload --port 9001
     ```
  ### Step 6: Open Swagger UI
     http://localhost:9001/docs
@@ -303,7 +304,7 @@ Returned in response
 
 ## 17. Running Tests
 Run:
-pytest tests/test_patient_service.py -v
+python -m pytest tests/test_patient_service.py -v
 
 Covers health, readiness, CRUD, validation, RBAC, etc.
 
