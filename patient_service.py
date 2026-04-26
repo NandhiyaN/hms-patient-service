@@ -249,30 +249,34 @@ def readiness_check():
 # --------------------------------------------------------------------------------------
 # Patient APIs
 # --------------------------------------------------------------------------------------
+
 @router.get("/patients", response_model=PatientListResponse)
 def get_patients(
     name: Optional[str] = Query(default=None, description="Filter by patient name"),
     phone: Optional[str] = Query(default=None, description="Filter by phone"),
-    is_active: Optional[bool] = Query(default=None, description="Filter by active status"),
+    # Default to True so only active patients are shown
+    is_active: Optional[bool] = Query(default=True, description="Filter by active status"),
     skip: int = Query(default=0, ge=0, description="Pagination offset"),
-    limit: int = Query(default=10, ge=1, le=100, description="Pagination limit"),
+    limit: int = Query(default=9, ge=1, le=100, description="Pagination limit"),
     db: Session = Depends(get_db),
     role: str = Depends(require_role(["admin", "reception", "doctor"]))
 ):
     """
-    Returns paginated patient list with optional filtering.
-    Assignment asks for pagination and filtering support.
+    Returns paginated patient list. 
+    By default, it now only returns active (non-deleted) records.
     """
     query = db.query(Patient)
 
+    # 1. Apply the active filter (defaults to True now)
+    if is_active is not None:
+        query = query.filter(Patient.is_active == is_active)
+
+    # 2. Apply search filters
     if name:
         query = query.filter(Patient.name.ilike(f"%{name}%"))
 
     if phone:
         query = query.filter(Patient.phone.like(f"%{phone}%"))
-
-    if is_active is not None:
-        query = query.filter(Patient.is_active == is_active)
 
     total = query.count()
     items = query.offset(skip).limit(limit).all()
@@ -283,7 +287,6 @@ def get_patients(
         skip=skip,
         limit=limit
     )
-
 
 @router.get("/patients/{patient_id}", response_model=PatientResponse)
 def get_patient(
