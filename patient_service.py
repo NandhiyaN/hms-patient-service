@@ -408,7 +408,3 @@ def delete_patient(
 
 # Register versioned routes
 app.include_router(router)
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("patient_service:app", host="127.0.0.1", port=9001, reload=True)
