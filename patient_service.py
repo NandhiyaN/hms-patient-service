@@ -9,8 +9,9 @@ import os
 import re
 import json
 from starlette.middleware.base import BaseHTTPMiddleware
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from common_utils import CorrelationIdMiddleware, setup_exception_handlers, require_role
+from typing import Optional
 
 # --------------------------------------------------------------------------------------
 # Database configuration
@@ -38,7 +39,7 @@ class Patient(Base):
     phone = Column(String(20), index=True, nullable=False)
     dob = Column(String(10), nullable=False)  # Stored as YYYY-MM-DD string for simplicity
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
 # Create tables on service startup if not already present.
 Base.metadata.create_all(bind=engine)
@@ -91,15 +92,15 @@ class PatientCreate(BaseModel):
 
 
 class PatientUpdate(BaseModel):
-    name: str | None = Field(default=None, min_length=2, max_length=100)
-    email: EmailStr | None = None
-    phone: str | None = Field(default=None, min_length=10, max_length=20)
-    dob: str | None = None
-    is_active: bool | None = None
+    name: Optional[str] = Field(default=None, min_length=2, max_length=100)
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = Field(default=None, min_length=10, max_length=20)
+    dob: Optional[str] = None
+    is_active: Optional[bool] = None
 
     @field_validator("phone")
     @classmethod
-    def validate_phone(cls, value: str | None) -> str | None:
+    def validate_phone(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
             return value
         cleaned = re.sub(r"[^\d+]", "", value)
@@ -109,7 +110,7 @@ class PatientUpdate(BaseModel):
 
     @field_validator("dob")
     @classmethod
-    def validate_dob(cls, value: str | None) -> str | None:
+    def validate_dob(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
             return value
         try:
@@ -168,7 +169,7 @@ def mask_pii(text: str) -> str:
     return text
 
 
-def log_event(level: str, message: str, correlation_id: str | None = None, **kwargs):
+def log_event(level: str, message: str, correlation_id: Optional[str] = None, **kwargs):
     """
     Centralized structured logging helper.
     All extra values are masked before logging.
@@ -178,7 +179,7 @@ def log_event(level: str, message: str, correlation_id: str | None = None, **kwa
         safe_payload[key] = mask_pii(str(value)) if value is not None else value
 
     log_entry = {
-        "timestamp": datetime.now(UTC).isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "service": "patient-service",
         "level": level.upper(),
         "message": message,
@@ -250,9 +251,9 @@ def readiness_check():
 # --------------------------------------------------------------------------------------
 @router.get("/patients", response_model=PatientListResponse)
 def get_patients(
-    name: str | None = Query(default=None, description="Filter by patient name"),
-    phone: str | None = Query(default=None, description="Filter by phone"),
-    is_active: bool | None = Query(default=None, description="Filter by active status"),
+    name: Optional[str] = Query(default=None, description="Filter by patient name"),
+    phone: Optional[str] = Query(default=None, description="Filter by phone"),
+    is_active: Optional[bool] = Query(default=None, description="Filter by active status"),
     skip: int = Query(default=0, ge=0, description="Pagination offset"),
     limit: int = Query(default=10, ge=1, le=100, description="Pagination limit"),
     db: Session = Depends(get_db),
