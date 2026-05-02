@@ -1,154 +1,242 @@
-openapi: 3.0.0
+openapi: 3.0.3
 info:
   title: Patient Service API
   version: 1.0.0
-  description: |
-    Hospital Management System - Patient Service API.
-
-    Responsibilities:
-    - Patient CRUD
-    - Search by name or phone
-    - Pagination and filtering
-    - Standard error response structure
-    - Role-based access control
-    - Correlation ID propagation
+  description: HMS Patient Service with PII-safe logging and RBAC
 
 servers:
   - url: http://localhost:9001
-    description: Local development server
 
-tags:
-  - name: Health
-    description: Health and readiness endpoints
-  - name: Patients
-    description: Patient management APIs
+paths:
+
+  /health:
+    get:
+      summary: Health Check
+      tags: [Health]
+      responses:
+        "200":
+          description: Service is healthy
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  service:
+                    type: string
+
+  /ready:
+    get:
+      summary: Readiness Check
+      tags: [Health]
+      responses:
+        "200":
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  service:
+                    type: string
+                  ready:
+                    type: boolean
+
+  /v1/patients:
+    get:
+      summary: Get patients (paginated)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: query
+          schema:
+            type: string
+        - name: phone
+          in: query
+          schema:
+            type: string
+        - name: is_active
+          in: query
+          schema:
+            type: boolean
+            default: true
+        - name: skip
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 9
+      responses:
+        "200":
+          description: Paginated patient list
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+    post:
+      summary: Create patient
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatientCreate"
+      responses:
+        "201":
+          description: Patient created
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientResponse"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /v1/patients/{patient_id}:
+    get:
+      summary: Get patient by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: patient_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Patient details
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    put:
+      summary: Update patient
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: patient_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatientUpdate"
+      responses:
+        "200":
+          description: Patient updated
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+    delete:
+      summary: Deactivate patient (soft delete)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: patient_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Patient deactivated
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  patient_id:
+                    type: integer
+        "404":
+          $ref: "#/components/responses/NotFound"
 
 components:
+
   securitySchemes:
-    bearerAuth:
+    BearerAuth:
       type: http
       scheme: bearer
-      bearerFormat: MockToken
-
-  parameters:
-    CorrelationIdHeader:
-      name: X-Correlation-ID
-      in: header
-      required: false
-      schema:
-        type: string
-      description: Optional correlation ID for tracing requests across services
 
   schemas:
-    ErrorResponse:
-      type: object
-      properties:
-        code:
-          type: string
-          example: "404"
-        message:
-          type: string
-          example: "Patient not found"
-        correlationId:
-          type: string
-          example: "0f9b7c85-a530-4eb9-a3d0-5414a9364a1e"
 
-    ValidationErrorResponse:
-      type: object
-      properties:
-        code:
-          type: string
-          example: "422"
-        message:
-          type: string
-          example: "Validation Error"
-        details:
-          type: array
-          items:
-            type: object
-        correlationId:
-          type: string
-          example: "0f9b7c85-a530-4eb9-a3d0-5414a9364a1e"
-
-    Patient:
+    PatientResponse:
       type: object
       properties:
         patient_id:
           type: integer
-          example: 1
         name:
           type: string
-          example: John Doe
         email:
           type: string
           format: email
-          example: john@example.com
         phone:
           type: string
-          example: "+91-9876543210"
         dob:
           type: string
-          format: date
-          example: "1990-01-15"
         is_active:
           type: boolean
-          example: true
         created_at:
           type: string
           format: date-time
-          example: "2026-04-19T10:00:00Z"
-
-    PatientCreate:
-      type: object
-      required:
-        - name
-        - email
-        - phone
-        - dob
-      properties:
-        name:
-          type: string
-          minLength: 2
-          maxLength: 100
-          example: John Doe
-        email:
-          type: string
-          format: email
-          example: john@example.com
-        phone:
-          type: string
-          minLength: 10
-          maxLength: 20
-          example: "+91-9876543210"
-        dob:
-          type: string
-          format: date
-          example: "1990-01-15"
-
-    PatientUpdate:
-      type: object
-      properties:
-        name:
-          type: string
-          minLength: 2
-          maxLength: 100
-          example: John Updated
-        email:
-          type: string
-          format: email
-          example: john.updated@example.com
-        phone:
-          type: string
-          minLength: 10
-          maxLength: 20
-          example: "+91-9876500000"
-        dob:
-          type: string
-          format: date
-          example: "1991-02-10"
-        is_active:
-          type: boolean
-          example: true
 
     PatientListResponse:
       type: object
@@ -156,325 +244,94 @@ components:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/Patient'
+            $ref: "#/components/schemas/PatientResponse"
         total:
           type: integer
-          example: 60
         skip:
           type: integer
-          example: 0
         limit:
           type: integer
-          example: 10
 
-paths:
-  /health:
-    get:
-      tags:
-        - Health
-      summary: Health check
-      parameters:
-        - $ref: '#/components/parameters/CorrelationIdHeader'
-      responses:
-        '200':
-          description: Service health status
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: ok
-                  service:
-                    type: string
-                    example: patient
+    PatientCreate:
+      type: object
+      required: [name, email, phone, dob]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        dob:
+          type: string
+          example: "1995-05-20"
 
-  /ready:
-    get:
-      tags:
-        - Health
-      summary: Readiness check
-      parameters:
-        - $ref: '#/components/parameters/CorrelationIdHeader'
-      responses:
-        '200':
-          description: Service readiness status
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: ok
-                  service:
-                    type: string
-                    example: patient
-                  ready:
-                    type: boolean
-                    example: true
+    PatientUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        dob:
+          type: string
+        is_active:
+          type: boolean
 
-  /v1/patients:
-    get:
-      tags:
-        - Patients
-      summary: List patients
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CorrelationIdHeader'
-        - name: name
-          in: query
-          required: false
-          schema:
-            type: string
-          description: Filter by patient name
-        - name: phone
-          in: query
-          required: false
-          schema:
-            type: string
-          description: Filter by phone
-        - name: is_active
-          in: query
-          required: false
-          schema:
-            type: boolean
-            default: true
-          description: Filter by active status
-        - name: skip
-          in: query
-          required: false
-          schema:
-            type: integer
-            default: 0
-            minimum: 0
-        - name: limit
-          in: query
-          required: false
-          schema:
-            type: integer
-            default: 9
-            minimum: 1
-            maximum: 100
-      responses:
-        '200':
-          description: Paginated patient list
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PatientListResponse'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ValidationErrorResponse'
-        '500':
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        correlationId:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
 
-    post:
-      tags:
-        - Patients
-      summary: Create a patient
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CorrelationIdHeader'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatientCreate'
-      responses:
-        '201':
-          description: Patient created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Patient'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '409':
-          description: Duplicate email conflict
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ValidationErrorResponse'
+  responses:
 
-  /v1/patients/{patient_id}:
-    get:
-      tags:
-        - Patients
-      summary: Get patient by ID
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CorrelationIdHeader'
-        - name: patient_id
-          in: path
-          required: true
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
           schema:
-            type: integer
-      responses:
-        '200':
-          description: Patient found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Patient'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Patient not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
 
-    put:
-      tags:
-        - Patients
-      summary: Update patient by ID
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CorrelationIdHeader'
-        - name: patient_id
-          in: path
-          required: true
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
           schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatientUpdate'
-      responses:
-        '200':
-          description: Patient updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Patient'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Patient not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '409':
-          description: Duplicate email conflict
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ValidationErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
 
-    delete:
-      tags:
-        - Patients
-      summary: Deactivate patient by ID
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/CorrelationIdHeader'
-        - name: patient_id
-          in: path
-          required: true
+    NotFound:
+      description: Not found
+      content:
+        application/json:
           schema:
-            type: integer
-      responses:
-        '200':
-          description: Patient deactivated successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: Successfully deactivated
-                  patient_id:
-                    type: integer
-                    example: 1
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Patient not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Conflict:
+      description: Conflict error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+tags:
+  - name: Health
+  - name: Patients
